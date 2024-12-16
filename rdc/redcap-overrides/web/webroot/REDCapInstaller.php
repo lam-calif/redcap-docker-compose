@@ -32,6 +32,16 @@ class REDCapInstaller {
      */
     public function __construct() {
         try {
+            // Redirect to / if REDCap has been installed once
+            if ($handle = opendir(dirname(__FILE__))) {
+                while (false !== ($entry = readdir($handle))) {
+                    if (preg_match("/^redcap_v\d+.\d+.\d+$/", $entry)) {
+                        header("Location: /");
+                        die();
+                    }
+                }
+                closedir($handle);
+            }
 
             // INITIALIZE DB FROM ENV PARAMS
             $this->hostname = 'db';
