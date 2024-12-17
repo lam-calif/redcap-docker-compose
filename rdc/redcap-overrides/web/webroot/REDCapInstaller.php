@@ -66,8 +66,6 @@ class REDCapInstaller {
             }
 
             if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-
-                $init_table = empty($_POST['init-table']) ? false : true;
                 $this->install_path = __DIR__ . $this->redcap_webroot_path;
                 $install_option = empty($_POST['install-option']) ? false : $_POST['install-option'];
 
@@ -155,37 +153,6 @@ class REDCapInstaller {
 
                         $redcap_version = $this->db_query("SELECT value FROM `redcap_config` WHERE field_name='redcap_version'")
                         ->fetch_assoc()['value'];
-
-                        // Set the Login Image
-                        $q = $this->db_query("UPDATE redcap_config set value = '/RDC_LOGO.png' where field_name='login_logo'");
-
-                        // Set the reporting mode to 0 (do not report stats to VUMC)
-                        $q = $this->db_query("UPDATE redcap_config set value = '0' where field_name='auto_report_stats'");
-                        $this->successes[] = "Turn off auto-reporting of statistics (turn back on if you want)";
-                        
-                        // Set server as development server
-                        $q = $this->db_query("UPDATE redcap_config set value = '1' where field_name='is_development_server'");
-                        $this->successes[] = "Set server type as development server";
-                        
-                        // Set autologout to never
-                        $q = $this->db_query("UPDATE redcap_config set value = '0' where field_name='autologout_timer'");
-                        $this->successes[] = "Set server logout time to never (to reduce headaches for local development)";
-                        
-                        // Set up the REDCap Instance Indicator EM
-                        $q = $this->db_query("INSERT INTO redcap_external_modules_downloads VALUES ('redcap_instance_indicator_v1.0.1',1607,now(), null)");
-                        $q = $this->db_query("INSERT INTO redcap_external_modules SET directory_prefix = 'redcap_instance_indicator'");
-                        $insert_id = $this->db_last_insert_id();
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'version', 'string', 'v1.0.1' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'enabled', 'boolean', 'false' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'discoverable-in-project', 'boolean', 'false' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'user-activate-permission', 'boolean', 'false' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'reserved-hide-from-non-admins-in-project-list', 'boolean', 'false' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_type', 'string', 'dev' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_position', 'string', 'tl' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_navbar', 'string', 'below' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_printable', 'boolean', 'false' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_custom', 'json-array', '[\"true\"]' )");
-                        $q = $this->db_query("INSERT INTO redcap_external_module_settings VALUES ($insert_id, null, 'indicator_navbar', 'string', 'below' )");
                         
                         // Direct the user to the remainder of the REDCap install.php
                         $this->successes[] = "Installed $redcap_tables REDCap tables to " . $this->db . " on " . $this->hostname;
@@ -196,35 +163,6 @@ class REDCapInstaller {
                             //    " and move onto the next steps." .
                             // <br>Click <a href='" . $install_url . "'>$install_url</a>. to continue." . 
                             "<br>Click <a href='$nextUrl'>$nextUrl</a> to continue.";
-
-                        if ($init_table) {
-
-                            $init_table_email = ($_POST['init-table-email']) ?: "you@example.org";
-                            $defaultUsers = $this->createDefaultUsersArray($init_table_email);
-                            $users_added = "";
-                            foreach($defaultUsers as $user) {
-                                $result = $this->createUser(...$user);
-                                $users_added .= $user[0] . "\n";
-                            }
-
-                            if ( version_compare($redcap_version, '10.1.0', '>=') ) {
-                                $admin_sql = "UPDATE redcap_user_information SET
-                                    access_system_config=1,
-                                    access_system_upgrade=1,
-                                    access_external_module_install=1,
-                                    admin_rights=1,
-                                    access_admin_dashboards=1
-                                        WHERE username='admin'";
-                                $this->db_query($admin_sql);
-                            }
-
-                            $this->successes[] = "Created users: $users_added";
-
-                            // Turn on table-based auth
-                            $this->db_query("UPDATE redcap_config SET value = 'table' WHERE field_name = 'auth_meth_global'");
-                            // revoke site_admin's admin privs to avoid warning
-                            $this->db_query("UPDATE redcap_user_information SET super_user = 0 WHERE username = 'site_admin'");
-                        }
 
                         $this->db_conn->close();
                         $this->step = 99; // DONE
@@ -250,47 +188,6 @@ class REDCapInstaller {
         $result = $this->db_query($sql);
         return $result;
     }
-
-    private function createDefaultUsersArray($email = "you@example.org") {
-        // Create 5 default users with a variable email address
-        $admin = [
-            /* $username = */ 'admin',
-            /* $email = */ $email,
-            /* $first_name = */ 'joe',
-            /* $last_name = */ 'admin',
-            /* $password = */ 'password',
-            /* $super = */ 1,
-            /* $account_manager = */ 0,
-            /* $salt_string = */ 'my_salt_string'
-        ];
-
-        $alice = [
-            /* $username = */ 'alice',
-            /* $email = */ $email,
-            /* $first_name = */ 'alice',
-            /* $last_name = */ 'manager',
-            /* $password = */ 'password',
-            /* $super = */ 0,
-            /* $account_manager = */ 1,
-            /* $salt_string = */ 'my_salt_string'
-        ];
-
-        $bob = [
-            /* $username = */ 'bob', /* $email = */ $email, /* $first_name = */ 'bob', /* $last_name = */ 'user', /* $password = */ 'password', /* $super = */ 0, /* $account_manager = */ 0, /* $salt_string = */ 'my_salt_string'
-        ];
-
-        $carol = [
-            /* $username = */ 'carol', /* $email = */ $email, /* $first_name = */ 'carol', /* $last_name = */ 'user', /* $password = */ 'password', /* $super = */ 0, /* $account_manager = */ 0, /* $salt_string = */ 'my_salt_string'
-        ];
-
-        $dan = [
-            /* $username = */ 'dan', /* $email = */ $email, /* $first_name = */ 'dan', /* $last_name = */ 'user', /* $password = */ 'password', /* $super = */ 0, /* $account_manager = */ 0, /* $salt_string = */ 'my_salt_string'
-        ];
-
-
-        return [$admin, $alice, $bob, $carol, $dan];
-    }
-
 
     /**
      * Build a database.php file to the dest_path
